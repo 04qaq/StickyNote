@@ -1,21 +1,21 @@
 #include "mainwindow.h"
-#include "titlebar.h"
+#include "tilebar.h"
 #include "sidebar.h"
-#include "../utils/windowhelper.h"
 
 #include <QApplication>
-#include <QHBoxLayout>
 #include <QVBoxLayout>
-#include <QTextEdit>
+#include <QHBoxLayout>
+#include <QLabel>
+
 #include <QPainter>
 #include <QPainterPath>
 #include <QPaintEvent>
 #include <QResizeEvent>
 #include <QCloseEvent>
+#include <QMouseEvent>
 #include <QEvent>
 #include <QSettings>
 #include <QScreen>
-#include <QLabel>
 
 MainWindow::MainWindow(QWidget* parent)
     : QWidget(parent)
@@ -25,19 +25,13 @@ MainWindow::MainWindow(QWidget* parent)
     // 背景透明，用于实现圆角和阴影
     setAttribute(Qt::WA_TranslucentBackground);
 
-    // 默认尺寸 900×600（含阴影边距）
-    setMinimumSize(700 + SHADOW_MARGIN * 2, 450 + SHADOW_MARGIN * 2);
+    setMinimumSize(400 + SHADOW_MARGIN * 2, 300 + SHADOW_MARGIN * 2);
     resize(900 + SHADOW_MARGIN * 2, 600 + SHADOW_MARGIN * 2);
 
     initUI();
-    initConnections();
-    applyStyle();
-
-    // 安装边缘缩放辅助
-    m_winHelper = new WindowHelper(this, this);
-
-    // 恢复上次窗口状态
+    connectSignals();
     restoreWindowState();
+
 }
 
 MainWindow::~MainWindow()
@@ -55,76 +49,86 @@ void MainWindow::initUI()
                                     SHADOW_MARGIN, SHADOW_MARGIN);
     outerLayout->setSpacing(0);
 
-    // 内容容器（圆角背景绘制在此 widget 上）
+    // 内容容器
     QWidget* contentWidget = new QWidget(this);
     contentWidget->setObjectName("contentWidget");
     outerLayout->addWidget(contentWidget);
 
-    // 内容容器主布局（垂直：标题栏 + 主体区域）
+    // 内容容器布局
     QVBoxLayout* contentLayout = new QVBoxLayout(contentWidget);
     contentLayout->setContentsMargins(0, 0, 0, 0);
     contentLayout->setSpacing(0);
 
-    // 标题栏
-    m_titleBar = new TitleBar(contentWidget);
-    contentLayout->addWidget(m_titleBar);
+    // 标题栏占位（可拖拽区域）
+    tile_bar_ = new TileBar(contentWidget);
+    contentLayout->addWidget(tile_bar_);
 
-    // 主体区域（水平：侧边栏 + 内容区）
+    // ---- 左右分栏容器 ----
     QWidget* bodyWidget = new QWidget(contentWidget);
     bodyWidget->setObjectName("bodyWidget");
     QHBoxLayout* bodyLayout = new QHBoxLayout(bodyWidget);
     bodyLayout->setContentsMargins(0, 0, 0, 0);
     bodyLayout->setSpacing(0);
 
-    // 侧边栏
-    m_sidebar = new Sidebar(bodyWidget);
-    bodyLayout->addWidget(m_sidebar);
+    // 左侧侧边栏
+    sidebar_ = new SideBar(bodyWidget);
+    bodyLayout->addWidget(sidebar_);
 
-    // 内容区（一期占位：文本编辑框，二期替换为便签列表）
-    m_textEdit = new QTextEdit(bodyWidget);
-    m_textEdit->setObjectName("textEdit");
-    m_textEdit->setPlaceholderText("便签内容区域（二期实现便签列表）...");
-    m_textEdit->setFrameShape(QFrame::NoFrame);
-    bodyLayout->addWidget(m_textEdit, 1);
+    // 右侧内容区占位
+    content_widget_ = new QWidget(bodyWidget);
+    content_widget_->setObjectName("contentArea");
+    QLabel* contentPlaceholder = new QLabel("内容区域", content_widget_);
+    contentPlaceholder->setAlignment(Qt::AlignCenter);
+    contentPlaceholder->setStyleSheet("color: #aaa; font-size: 16px;");
+    QVBoxLayout* contentAreaLayout = new QVBoxLayout(content_widget_);
+    contentAreaLayout->addWidget(contentPlaceholder);
+    bodyLayout->addWidget(content_widget_, 1);   // stretch = 1，占满剩余宽度
 
     contentLayout->addWidget(bodyWidget, 1);
-}
 
-void MainWindow::initConnections()
-{
-    connect(m_titleBar, &TitleBar::minimizeRequested, this, &MainWindow::showMinimized);
-    connect(m_titleBar, &TitleBar::closeRequested,    this, &MainWindow::close);
-    connect(m_titleBar, &TitleBar::maximizeRequested, this, [this]() {
-        if (isMaximized())
-            showNormal();
-        else
-            showMaximized();
-    });
-}
-
-void MainWindow::applyStyle()
-{
-    setStyleSheet(R"(
+    contentWidget->setStyleSheet(R"(
         QWidget#contentWidget {
             background-color: #F5F6FA;
             border-radius: 8px;
         }
-
         QWidget#bodyWidget {
-            background-color: #F5F6FA;
-            border-bottom-left-radius: 8px;
-            border-bottom-right-radius: 8px;
+            background: transparent;
         }
-
-        QTextEdit#textEdit {
-            background-color: #ffffff;
-            border: none;
-            padding: 12px;
-            font-size: 13px;
-            color: #333;
+        QWidget#contentArea {
+            background-color: #F5F6FA;
             border-bottom-right-radius: 8px;
         }
     )");
+
+
+}
+
+void MainWindow::connectSignals() {
+
+    connect(tile_bar_, &TileBar::minimizeRequested, this, &MainWindow::onMinimizeRequested);
+    connect(tile_bar_, &TileBar::maximizeRequested, this, &MainWindow::onMaximizeRequested);
+    connect(tile_bar_, &TileBar::closeRequested,    this, &MainWindow::onCloseRequested);
+}
+
+
+void MainWindow::onMinimizeRequested()
+{
+    showMinimized();
+}
+
+void MainWindow::onMaximizeRequested()
+{
+    if (isMaximized()) {
+        showNormal();
+    }
+    else {
+        showMaximized();
+    }
+}
+
+void MainWindow::onCloseRequested()
+{
+    close();  // 会触发 closeEvent，自动保存窗口状态
 }
 
 // ----------------------------------------------------------------
@@ -144,7 +148,6 @@ void MainWindow::restoreWindowState()
     if (settings.contains("mainwindow/geometry")) {
         restoreGeometry(settings.value("mainwindow/geometry").toByteArray());
     } else {
-        // 首次启动：居中显示
         QScreen* screen = QApplication::primaryScreen();
         if (screen) {
             QRect screenRect = screen->availableGeometry();
@@ -164,7 +167,6 @@ void MainWindow::paintEvent(QPaintEvent* event)
 {
     Q_UNUSED(event)
 
-    // 最大化时不绘制阴影和圆角
     if (isMaximized()) {
         QPainter painter(this);
         painter.fillRect(rect(), QColor("#F5F6FA"));
@@ -213,16 +215,58 @@ void MainWindow::closeEvent(QCloseEvent* event)
 void MainWindow::changeEvent(QEvent* event)
 {
     if (event->type() == QEvent::WindowStateChange) {
-        bool maximized = isMaximized();
-        m_titleBar->updateMaxButton(maximized);
+        if (tile_bar_) {
+            tile_bar_->updateMaximizeButton(isMaximized());
+        }
 
-        // 最大化时去掉阴影边距
         QVBoxLayout* outerLayout = qobject_cast<QVBoxLayout*>(layout());
         if (outerLayout) {
-            int margin = maximized ? 0 : SHADOW_MARGIN;
+            int margin = isMaximized() ? 0 : SHADOW_MARGIN;
             outerLayout->setContentsMargins(margin, margin, margin, margin);
         }
         update();
     }
     QWidget::changeEvent(event);
+}
+
+// ----------------------------------------------------------------
+// 拖拽移动
+// ----------------------------------------------------------------
+void MainWindow::mousePressEvent(QMouseEvent* event)
+{
+    if (event->button() == Qt::LeftButton) {
+        // 只在标题栏区域内允许拖拽
+        int titleBottom = SHADOW_MARGIN + TITLE_BAR_HEIGHT;
+        if (event->position().y() <= titleBottom) {
+            m_dragStartPos = event->globalPosition().toPoint() - frameGeometry().topLeft();
+            m_isDragging = true;
+            event->accept();
+            return;
+        }
+    }
+    QWidget::mousePressEvent(event);
+}
+
+void MainWindow::mouseMoveEvent(QMouseEvent* event)
+{
+    if (m_isDragging && (event->buttons() & Qt::LeftButton)) {
+        if (isMaximized()) {
+            showNormal();
+            m_dragStartPos = QPoint(width() / 2, TITLE_BAR_HEIGHT / 2);
+        }
+        move(event->globalPosition().toPoint() - m_dragStartPos);
+        event->accept();
+        return;
+    }
+    QWidget::mouseMoveEvent(event);
+}
+
+void MainWindow::mouseReleaseEvent(QMouseEvent* event)
+{
+    if (event->button() == Qt::LeftButton) {
+        m_isDragging = false;
+        event->accept();
+        return;
+    }
+    QWidget::mouseReleaseEvent(event);
 }
