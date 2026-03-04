@@ -29,6 +29,8 @@ set(SOURCES
     src/ui/tilebar.cpp
     src/ui/sidebar.cpp
     src/utils/windowhelper.cpp
+    src/common/notedata.cpp
+    src/core/notemanager.cpp
 )
 
 
@@ -38,6 +40,9 @@ set(HEADERS
     src/ui/tilebar.h
     src/ui/sidebar.h
     src/utils/windowhelper.h
+    src/common/notedata.h
+    src/common/global.h
+    src/core/notemanager.h
 )
 
 
