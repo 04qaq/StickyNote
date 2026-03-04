@@ -29,13 +29,15 @@ QJsonObject NoteData::toJson() const {
     return obj;
 }
 
-NoteData NoteData::createNew(const QString& title, const QString& category) {
+NoteData NoteData::createNew(const QString& title, const QString& content,
+                             const QString& category, const QString& color) {
     NoteData note;
     note.id         = QUuid::createUuid().toString(QUuid::WithoutBraces);
     note.title      = title;
-    note.content    = "";
+    note.content    = content;
     note.category   = category;
-    note.color      = "#FFEAA7";
+    note.color      = color;
+
     note.pinned     = false;
     note.sortOrder  = 0;
     note.createdAt  = QDateTime::currentDateTime();

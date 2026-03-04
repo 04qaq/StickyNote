@@ -2,11 +2,15 @@
 
 #include <QWidget>
 #include <QPoint>
+#include <QVBoxLayout>
 #include "../utils/windowhelper.h"
 
 class TileBar;
-
 class SideBar;
+class NoteListView;
+class NoteListModel;
+class NoteCardDelegate;
+
 class QPaintEvent;
 class QResizeEvent;
 class QCloseEvent;
@@ -74,7 +78,11 @@ private:
     // ---- 标题栏高度（可拖拽区域）----
     static constexpr int TITLE_BAR_HEIGHT = 36;
 
-    TileBar* tile_bar_ = nullptr;
-    SideBar *sidebar_ = nullptr;
-    QWidget* content_widget_ = nullptr;
+    TileBar*          tile_bar_       = nullptr;
+    SideBar*          sidebar_        = nullptr;
+    QWidget*          content_widget_ = nullptr;
+    QVBoxLayout*      content_layout_ = nullptr;
+    NoteListView*     note_list_view_ = nullptr;
+    NoteListModel*    note_model_     = nullptr;
+    NoteCardDelegate* note_delegate_  = nullptr;
 };

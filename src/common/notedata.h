@@ -19,5 +19,9 @@ struct NoteData {
 
     // 工厂方法：创建一条新便签，自动生成 id 和时间戳
     static NoteData createNew(const QString& title = "",
-                              const QString& category = "未分类");
+                              const QString& content = "",
+                              const QString& category = "未分类",
+                              const QString& color = "#FFEAA7");
 };
+
+Q_DECLARE_METATYPE(NoteData)

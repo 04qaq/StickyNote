@@ -7,10 +7,13 @@
 #include <QJsonArray>
 #include <QDebug>
 
+NoteManager::NoteManager(QObject* parent) : QObject(parent) {}
+
 NoteManager* NoteManager::instance() {
 	static NoteManager instance;
 	return &instance;
 }
+
 
 void NoteManager::addNote(const NoteData& note) {
 	notes_.append(note);
@@ -129,7 +132,8 @@ void NoteManager::save() {
 
 	QJsonObject root;
 	root["notes"] = notesArray;
-	root["categories"] = categoriesArray;
+	root["customCategories"] = categoriesArray;
+
 
 	QByteArray jsonData = QJsonDocument(root).toJson();
 

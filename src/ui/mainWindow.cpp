@@ -1,11 +1,16 @@
 #include "mainwindow.h"
 #include "tilebar.h"
 #include "sidebar.h"
+#include "notelistview.h"
+#include "notecarddelegate.h"
+#include "models/notelistmodel.h"
+#include "core/notemanager.h"
 
 #include <QApplication>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QLabel>
+
 
 #include <QPainter>
 #include <QPainterPath>
@@ -84,15 +89,57 @@ void MainWindow::initUI()
     sidebar_ = new SideBar(bodyWidget);
     bodyLayout->addWidget(sidebar_);
 
-    // 右侧内容区占位
+    // 右侧内容区
     content_widget_ = new QWidget(bodyWidget);
     content_widget_->setObjectName("contentArea");
-    QLabel* contentPlaceholder = new QLabel("内容区域", content_widget_);
-    contentPlaceholder->setAlignment(Qt::AlignCenter);
-    contentPlaceholder->setStyleSheet("color: #aaa; font-size: 16px;");
-    QVBoxLayout* contentAreaLayout = new QVBoxLayout(content_widget_);
-    contentAreaLayout->addWidget(contentPlaceholder);
+    content_layout_ = new QVBoxLayout(content_widget_);
+    content_layout_->setContentsMargins(0, 0, 0, 0);
+    content_layout_->setSpacing(0);
+
+    // 便签列表视图
+    note_model_     = new NoteListModel(this);
+    note_delegate_  = new NoteCardDelegate(this);
+    note_list_view_ = new NoteListView(content_widget_);
+    note_list_view_->setModel(note_model_);
+    note_list_view_->setItemDelegate(note_delegate_);
+    content_layout_->addWidget(note_list_view_);
+
     bodyLayout->addWidget(content_widget_, 1);   // stretch = 1，占满剩余宽度
+
+    // 加载数据
+    NoteManager::instance()->load();
+
+    // 首次运行时插入演示便签
+    if (NoteManager::instance()->notes().isEmpty()) {
+        NoteManager::instance()->addNote(NoteData::createNew(
+            "欢迎使用 Sticky Notes",
+            "这是你的第一条便签！\n你可以在这里记录任何想法、待办事项或灵感。",
+            "工作", "#FFEAA7"));
+        NoteManager::instance()->addNote(NoteData::createNew(
+            "今日计划",
+            "1. 完成项目报告\n2. 回复邮件\n3. 下午 3 点开会",
+            "工作", "#FAB1A0"));
+        NoteManager::instance()->addNote(NoteData::createNew(
+            "购物清单",
+            "- 牛奶\n- 面包\n- 鸡蛋\n- 苹果",
+            "生活", "#81ECEC"));
+        NoteManager::instance()->addNote(NoteData::createNew(
+            "Qt 学习笔记",
+            "Model/View 架构要点：\n• QAbstractListModel 负责数据\n• QListView 负责展示\n• Delegate 负责绘制每一项",
+            "学习", "#A29BFE"));
+        NoteManager::instance()->addNote(NoteData::createNew(
+            "读书摘录",
+            "「代码是写给人读的，只是顺便让机器执行。」\n—— Harold Abelson",
+            "学习", "#DFE6E9"));
+    }
+
+    note_model_->refresh();
+
+
+    // 数据变更时自动刷新列表
+    connect(NoteManager::instance(), &NoteManager::dataChanged,
+            note_model_, &NoteListModel::refresh);
+
 
     contentLayout->addWidget(bodyWidget, 1);
 
@@ -339,6 +386,12 @@ bool MainWindow::eventFilter(QObject* watched, QEvent* event)
     if (event->type() == QEvent::MouseMove && !isMaximized()) {
         QWidget* w = qobject_cast<QWidget*>(watched);
         if (w) {
+            // 如果鼠标在 NoteListView 内容区，不修改光标，避免干扰列表交互
+            if (note_list_view_ && (w == note_list_view_ ||
+                note_list_view_->isAncestorOf(w))) {
+                return QWidget::eventFilter(watched, event);
+            }
+
             QMouseEvent* me = static_cast<QMouseEvent*>(event);
             QPoint posInWindow = w->mapTo(this, me->position().toPoint());
             ResizeEdge edge = window_helper_->hitTest(posInWindow);
@@ -348,6 +401,7 @@ bool MainWindow::eventFilter(QObject* watched, QEvent* event)
     }
     return QWidget::eventFilter(watched, event);
 }
+
 
 
 

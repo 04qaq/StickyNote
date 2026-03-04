@@ -28,9 +28,12 @@ set(SOURCES
     src/ui/mainwindow.cpp
     src/ui/tilebar.cpp
     src/ui/sidebar.cpp
+    src/ui/notelistview.cpp
+    src/ui/notecarddelegate.cpp
     src/utils/windowhelper.cpp
     src/common/notedata.cpp
     src/core/notemanager.cpp
+    src/models/notelistmodel.cpp
 )
 
 
@@ -39,10 +42,13 @@ set(HEADERS
     src/ui/mainwindow.h
     src/ui/tilebar.h
     src/ui/sidebar.h
+    src/ui/notelistview.h
+    src/ui/notecarddelegate.h
     src/utils/windowhelper.h
     src/common/notedata.h
     src/common/global.h
     src/core/notemanager.h
+     src/models/notelistmodel.h
 )
 
 
@@ -65,7 +71,11 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ui
     ${CMAKE_CURRENT_SOURCE_DIR}/src/utils
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/common
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/core
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/models
 )
+
 
 
 
