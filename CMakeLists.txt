@@ -28,14 +28,18 @@ set(SOURCES
     src/ui/mainwindow.cpp
     src/ui/tilebar.cpp
     src/ui/sidebar.cpp
+    src/utils/windowhelper.cpp
 )
+
 
 # ---- 头文件 ----
 set(HEADERS
     src/ui/mainwindow.h
     src/ui/tilebar.h
     src/ui/sidebar.h
+    src/utils/windowhelper.h
 )
+
 
 # 添加可执行文件
 add_executable(${PROJECT_NAME}
@@ -55,7 +59,9 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ui
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/utils
 )
+
 
 
 # 设置目标属性

@@ -15,6 +15,8 @@
 #include <QMouseEvent>
 #include <QEvent>
 #include <QSettings>
+
+
 #include <QScreen>
 
 MainWindow::MainWindow(QWidget* parent)
@@ -28,11 +30,19 @@ MainWindow::MainWindow(QWidget* parent)
     setMinimumSize(400 + SHADOW_MARGIN * 2, 300 + SHADOW_MARGIN * 2);
     resize(900 + SHADOW_MARGIN * 2, 600 + SHADOW_MARGIN * 2);
 
+    // 初始化缩放辅助类
+    window_helper_ = new WindowHelper(this, SHADOW_MARGIN, RESIZE_MARGIN);
+
     initUI();
     connectSignals();
     restoreWindowState();
 
+    // 为 MainWindow 自身安装过滤器（覆盖阴影区域等无子控件区域）
+    installEventFilter(this);
+
+
 }
+
 
 MainWindow::~MainWindow()
 {
@@ -100,8 +110,13 @@ void MainWindow::initUI()
         }
     )");
 
-
+    // 递归为所有子孙控件安装事件过滤器并开启鼠标追踪
+    for (QWidget* w : findChildren<QWidget*>()) {
+        w->installEventFilter(this);
+        w->setMouseTracking(true);
+    }
 }
+
 
 void MainWindow::connectSignals() {
 
@@ -234,10 +249,20 @@ void MainWindow::changeEvent(QEvent* event)
 // ----------------------------------------------------------------
 void MainWindow::mousePressEvent(QMouseEvent* event)
 {
-    if (event->button() == Qt::LeftButton) {
-        // 只在标题栏区域内允许拖拽
+    if (event->button() == Qt::LeftButton && !isMaximized()) {
+        QPoint pos = event->position().toPoint();
+
+        // 优先检测边缘缩放
+        ResizeEdge edge = window_helper_->hitTest(pos);
+        if (edge != ResizeEdge::None) {
+            window_helper_->startResize(edge, event->globalPosition().toPoint());
+            event->accept();
+            return;
+        }
+
+        // 标题栏区域：拖拽移动
         int titleBottom = SHADOW_MARGIN + TITLE_BAR_HEIGHT;
-        if (event->position().y() <= titleBottom) {
+        if (pos.y() <= titleBottom && pos.y() >= SHADOW_MARGIN) {
             m_dragStartPos = event->globalPosition().toPoint() - frameGeometry().topLeft();
             m_isDragging = true;
             event->accept();
@@ -247,26 +272,83 @@ void MainWindow::mousePressEvent(QMouseEvent* event)
     QWidget::mousePressEvent(event);
 }
 
+
 void MainWindow::mouseMoveEvent(QMouseEvent* event)
 {
+    QPoint pos       = event->position().toPoint();
+    QPoint globalPos = event->globalPosition().toPoint();
+
+    // 正在缩放
+    if (window_helper_->isResizing()) {
+        window_helper_->doResize(globalPos);
+        event->accept();
+        return;
+    }
+
+    // 正在拖拽移动
     if (m_isDragging && (event->buttons() & Qt::LeftButton)) {
         if (isMaximized()) {
             showNormal();
             m_dragStartPos = QPoint(width() / 2, TITLE_BAR_HEIGHT / 2);
         }
-        move(event->globalPosition().toPoint() - m_dragStartPos);
+        move(globalPos - m_dragStartPos);
         event->accept();
         return;
     }
+
+    // 未按下鼠标：更新光标形状（悬停反馈）
+    if (!isMaximized()) {
+        ResizeEdge edge = window_helper_->hitTest(pos);
+        window_helper_->updateCursor(edge);
+    }
+
     QWidget::mouseMoveEvent(event);
 }
+
 
 void MainWindow::mouseReleaseEvent(QMouseEvent* event)
 {
     if (event->button() == Qt::LeftButton) {
+        if (window_helper_->isResizing()) {
+            window_helper_->stopResize();
+            event->accept();
+            return;
+        }
         m_isDragging = false;
         event->accept();
         return;
     }
     QWidget::mouseReleaseEvent(event);
 }
+
+void MainWindow::leaveEvent(QEvent* event)
+{
+    // 鼠标离开窗口时恢复默认光标（缩放中不恢复）
+    if (!window_helper_->isResizing()) {
+        setCursor(Qt::ArrowCursor);
+    }
+    QWidget::leaveEvent(event);
+}
+
+// ----------------------------------------------------------------
+// 事件过滤器：拦截所有子控件的鼠标移动事件，更新光标形状
+// 子控件坐标需转换为 MainWindow 坐标后再做 hitTest
+// ----------------------------------------------------------------
+bool MainWindow::eventFilter(QObject* watched, QEvent* event)
+{
+    if (event->type() == QEvent::MouseMove && !isMaximized()) {
+        QWidget* w = qobject_cast<QWidget*>(watched);
+        if (w) {
+            QMouseEvent* me = static_cast<QMouseEvent*>(event);
+            QPoint posInWindow = w->mapTo(this, me->position().toPoint());
+            ResizeEdge edge = window_helper_->hitTest(posInWindow);
+            // 将光标设置到鼠标实际所在的子控件上，避免被父窗口光标覆盖
+            window_helper_->updateCursor(edge, w);
+        }
+    }
+    return QWidget::eventFilter(watched, event);
+}
+
+
+
+

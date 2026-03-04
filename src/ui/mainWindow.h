@@ -2,14 +2,22 @@
 
 #include <QWidget>
 #include <QPoint>
+#include "../utils/windowhelper.h"
 
 class TileBar;
+
 class SideBar;
 class QPaintEvent;
 class QResizeEvent;
 class QCloseEvent;
 class QMouseEvent;
 class QEvent;
+
+// ==========================================================================================
+//第一阶段中拦截子组件的鼠标移动事件，可能会导致子组件的鼠标移动事件无法触发，出现问题先看这里
+// ===========================================================================================
+
+
 
 // ============================================================
 // MainWindow —— 无边框主窗口
@@ -38,8 +46,12 @@ protected:
     void mousePressEvent(QMouseEvent* event) override;
     void mouseMoveEvent(QMouseEvent* event) override;
     void mouseReleaseEvent(QMouseEvent* event) override;
+    void leaveEvent(QEvent* event) override;
+    bool eventFilter(QObject* watched, QEvent* event) override;
+
 
 private:
+
     void initUI();
     void connectSignals();
 
@@ -49,6 +61,11 @@ private:
     // ---- 拖拽移动 ----
     QPoint m_dragStartPos;
     bool   m_isDragging = false;
+
+    // ---- 边缘缩放 ----
+    WindowHelper* window_helper_ = nullptr;
+    static constexpr int RESIZE_MARGIN = 6;  // 缩放检测区域宽度
+
 
     // ---- 阴影边距 ----
     static constexpr int SHADOW_MARGIN = 10;
