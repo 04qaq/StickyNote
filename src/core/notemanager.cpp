@@ -6,7 +6,6 @@
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QDebug>
-
 NoteManager::NoteManager(QObject* parent) : QObject(parent) {}
 
 NoteManager* NoteManager::instance() {
@@ -69,17 +68,32 @@ void NoteManager::load() {
 	QString filePath = notesFilePath();
 	QFile file(filePath);
 
-	if(!file.exists()) {
-		qDebug()<<"File not exists"<<filePath;
-		return;
+	//save采用的是先删除原文件在修改临时文件为原文件，可能出现临时文件未被重命名就进程终止
+	//因此需要先判断临时文件是否存在，如果存在则删除原文件并重命名临时文件
+	//Linux下可以实现原子操作，但Windows下不被允许
+	QString temfilePath = filePath + ".tmp";
+	QFile temFile(temfilePath);
+	if(temFile.exists()) {
+		file.remove();
+		temFile.rename(filePath);
+		temFile.remove();
 	}
+	else {
+		if(!file.exists()) {
+			qWarning()<<"Failed to open file"<<filePath;
+			return;
+		}
+	}
+
 
 	if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
 		qWarning()<<"Failed to open file"<<filePath;
 		return;
 	}
 
-	QByteArray data = file.readAll();
+	QByteArray data = file.readAll();//当文件特别大的时候一次性读取会导致卡顿
+	//但标签功能的json文件一般较小，因此不是问题
+	//如果出现卡顿可以考虑分块读取，或者按行读取。
 	file.close();
 
 	QJsonParseError error;
@@ -155,3 +169,4 @@ void NoteManager::save() {
 		qWarning() << "文件重命名失败：" << tmpPath << " → " << filePath;
 	}
 }
+

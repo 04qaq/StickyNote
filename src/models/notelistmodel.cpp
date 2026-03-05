@@ -2,13 +2,14 @@
 #include "core/notemanager.h"
 #include <algorithm>
 
+
 NoteListModel::NoteListModel(QObject* parent):
 	QAbstractListModel(parent) {
 	connect(NoteManager::instance(), &NoteManager::dataChanged, this, &NoteListModel::refresh);
 }
 
-int NoteListModel::rowCount(const QModelIndex& indx) const {
-	if (indx.isValid())return 0;
+int NoteListModel::rowCount(const QModelIndex& parent) const {
+	if (parent.isValid())return 0;
 	return sortedNotes_.size();
 
 }
@@ -55,3 +56,5 @@ void NoteListModel::refresh() {
 	sortNotes();
 	endResetModel();
 }
+
+

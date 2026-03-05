@@ -3,16 +3,16 @@
 
 NoteData NoteData::fromJson(const QJsonObject& obj) {
     NoteData note;
-    note.id         = obj["id"].toString();
-    note.title      = obj["title"].toString();
-    note.content    = obj["content"].toString();
-    note.category   = obj["category"].toString("未分类");
-    note.color      = obj["color"].toString("#FFEAA7");
-    note.pinned     = obj["pinned"].toBool(false);
-    note.sortOrder  = obj["sortOrder"].toInt(0);
-    note.createdAt  = QDateTime::fromString(obj["createdAt"].toString(), Qt::ISODate);
-    note.modifiedAt = QDateTime::fromString(obj["modifiedAt"].toString(), Qt::ISODate);
-    return note;
+    note.id = obj["id"].toString();
+    note.title = obj["title"].toString();
+    note.content = obj["content"].toString();
+	note.category = obj["category"].toString();
+	note.color = obj["color"].toString();
+	note.pinned = obj["pinned"].toBool();
+	note.sortOrder = obj["sortOrder"].toInt();
+	note.createdAt = QDateTime::fromString(obj["createdAt"].toString(), Qt::ISODate);
+	note.modifiedAt = QDateTime::fromString(obj["modifiedAt"].toString(), Qt::ISODate);
+	return note;
 }
 
 QJsonObject NoteData::toJson() const {

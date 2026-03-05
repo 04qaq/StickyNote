@@ -135,12 +135,6 @@ void MainWindow::initUI()
 
     note_model_->refresh();
 
-
-    // 数据变更时自动刷新列表
-    connect(NoteManager::instance(), &NoteManager::dataChanged,
-            note_model_, &NoteListModel::refresh);
-
-
     contentLayout->addWidget(bodyWidget, 1);
 
     contentWidget->setStyleSheet(R"(

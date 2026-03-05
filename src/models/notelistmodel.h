@@ -2,7 +2,6 @@
 #include "common/notedata.h"
 #include <QAbstractListModel>
 
-
 enum NoteRole {
 	NoteIdRole = Qt::UserRole + 1,
     NoteTitleRole,
@@ -14,7 +13,6 @@ enum NoteRole {
     NoteModifiedAtRole,
     NoteDataRole,
 };
-
 class NoteListModel : public QAbstractListModel {
 	Q_OBJECT
 public:
@@ -30,3 +28,4 @@ private:
 	QList<NoteData> sortedNotes_;
     void sortNotes();
 };
+

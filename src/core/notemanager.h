@@ -4,7 +4,6 @@
 #include <QStringList>
 #include "common/notedata.h"
 
-
 class NoteManager : public QObject {
 	Q_OBJECT
 public:
