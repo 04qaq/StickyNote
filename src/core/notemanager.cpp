@@ -6,6 +6,8 @@
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QDebug>
+#include <QDateTime>
+
 NoteManager::NoteManager(QObject* parent) : QObject(parent) {}
 
 NoteManager* NoteManager::instance() {
@@ -41,6 +43,72 @@ void NoteManager::removeNote(const QString& id) {
     }
     save();
     emit dataChanged();
+}
+
+void NoteManager::removeNotes(const QStringList& ids) {
+    for (const QString& id : ids) {
+        for (auto it = notes_.begin(); it != notes_.end(); ++it) {
+            if (it->id == id) {
+                notes_.erase(it);
+                break;
+            }
+        }
+    }
+    save();
+    emit dataChanged();
+}
+
+void NoteManager::togglePin(const QString& id) {
+    for (auto& n : notes_) {
+        if (n.id == id) {
+            n.pinned = !n.pinned;
+            n.modifiedAt = QDateTime::currentDateTime();
+            break;
+        }
+    }
+    save();
+    emit dataChanged();
+}
+
+void NoteManager::updateNoteCategory(const QString& id, const QString& category) {
+    for (auto& n : notes_) {
+        if (n.id == id) {
+            n.category = category;
+            n.modifiedAt = QDateTime::currentDateTime();
+            break;
+        }
+    }
+    save();
+    emit dataChanged();
+}
+
+void NoteManager::updateNoteColor(const QString& id, const QString& color) {
+    for (auto& n : notes_) {
+        if (n.id == id) {
+            n.color = color;
+            n.modifiedAt = QDateTime::currentDateTime();
+            break;
+        }
+    }
+    save();
+    emit dataChanged();
+}
+
+void NoteManager::addCategory(const QString& category) {
+
+	if (!customCategories_.contains(category)) {
+		customCategories_.append(category);
+		save();
+		emit dataChanged();	
+	}
+
+}
+void NoteManager::removeCategory(const QString& category){
+	if(customCategories_.contains(category)) {
+		customCategories_.removeOne(category);
+		save();
+		emit dataChanged();
+	}
 }
 
 

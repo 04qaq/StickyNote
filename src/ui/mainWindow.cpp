@@ -5,6 +5,10 @@
 #include "notecarddelegate.h"
 #include "models/notelistmodel.h"
 #include "core/notemanager.h"
+#include "models/notefilterproxymodel.h"
+#include "ui/noteeditdialog.h"
+#include "ui/notepreviewdialog.h"
+
 
 #include <QApplication>
 #include <QVBoxLayout>
@@ -96,13 +100,17 @@ void MainWindow::initUI()
     content_layout_->setContentsMargins(0, 0, 0, 0);
     content_layout_->setSpacing(0);
 
+
     // 便签列表视图
     note_model_     = new NoteListModel(this);
+    note_proxy_model_ = new NoteFilterProxyModel(this);
+    note_proxy_model_->setSourceModel(note_model_);   // 绑定数据源，筛选才能生效
     note_delegate_  = new NoteCardDelegate(this);
     note_list_view_ = new NoteListView(content_widget_);
-    note_list_view_->setModel(note_model_);
+    note_list_view_->setModel(note_proxy_model_);
     note_list_view_->setItemDelegate(note_delegate_);
     content_layout_->addWidget(note_list_view_);
+
 
     bodyLayout->addWidget(content_widget_, 1);   // stretch = 1，占满剩余宽度
 
@@ -135,6 +143,11 @@ void MainWindow::initUI()
 
     note_model_->refresh();
 
+    // 把 NoteManager 中已有的分类同步到侧边栏
+    sidebar_->refreshCategories();
+
+
+
     contentLayout->addWidget(bodyWidget, 1);
 
     contentWidget->setStyleSheet(R"(
@@ -163,8 +176,23 @@ void MainWindow::connectSignals() {
 
     connect(tile_bar_, &TileBar::minimizeRequested, this, &MainWindow::onMinimizeRequested);
     connect(tile_bar_, &TileBar::maximizeRequested, this, &MainWindow::onMaximizeRequested);
-    connect(tile_bar_, &TileBar::closeRequested,    this, &MainWindow::onCloseRequested);
+    connect(tile_bar_, &TileBar::closeRequested, this, &MainWindow::onCloseRequested);
+    connect(note_list_view_, &NoteListView::doubleClicked, this, &MainWindow::onNoteDoubleClicked);
+    connect(note_list_view_, &NoteListView::deleteNoteRequested, this, &MainWindow::onNoteDeleted);
+    connect(note_list_view_, &NoteListView::editNoteRequested, this, &MainWindow::onNoteEdited);
+    connect(note_list_view_, &NoteListView::pinToggleRequested, this, &MainWindow::onNotePinToggled);
+    connect(note_list_view_, &NoteListView::changeCategoryRequested, this, &MainWindow::onNoteCategoryChanged);
+    connect(note_list_view_, &NoteListView::changeColorRequested, this, &MainWindow::onNoteColorChanged);
+    connect(note_list_view_, &NoteListView::openPreviewRequested, this, &MainWindow::onNotePreviewRequested);
+    connect(note_list_view_, &NoteListView::deleteMultipleRequested, this, &MainWindow::onNotesDeletedMultiple);
+    connect(tile_bar_, &TileBar::newNoteRequested, this, &MainWindow::onNewNoteRequested);
+    connect(sidebar_, &SideBar::categoryChanged, note_proxy_model_,
+        &NoteFilterProxyModel::setCategory);
+    connect(tile_bar_, &TileBar::searchTextChanged, note_proxy_model_,
+        &NoteFilterProxyModel::setKeyword);
+
 }
+    
 
 
 void MainWindow::onMinimizeRequested()
@@ -185,6 +213,84 @@ void MainWindow::onMaximizeRequested()
 void MainWindow::onCloseRequested()
 {
     close();  // 会触发 closeEvent，自动保存窗口状态
+}
+
+
+void MainWindow::onNewNoteRequested() {
+    NoteData note;
+    NoteEditDialog dialog(note, this);
+	if (dialog.exec() == QDialog::Accepted) {
+		NoteManager::instance()->addNote(dialog.result());
+		note_model_->refresh();
+	}
+}
+
+void MainWindow::onNoteDoubleClicked(const QModelIndex& proxyIndex) {
+    QModelIndex sourceIndex = note_proxy_model_->mapToSource(proxyIndex);
+    NoteData note = note_model_->data(sourceIndex, NoteDataRole).value<NoteData>();
+    NotePreviewDialog dialog(note, this);
+    dialog.exec();
+}
+
+
+void MainWindow::onNoteDeleted(const QModelIndex& proxyIndex) {
+    QModelIndex sourceIndex = note_proxy_model_->mapToSource(proxyIndex);
+    NoteData data = note_model_->data(sourceIndex, NoteDataRole).value<NoteData>();
+    NoteManager::instance()->removeNote(data.id);
+    note_model_->refresh();
+
+}
+
+
+void MainWindow::onNoteEdited(const QModelIndex& proxyIndex) {
+    QModelIndex sourceIndex = note_proxy_model_->mapToSource(proxyIndex);
+    NoteData note = note_model_->data(sourceIndex, NoteDataRole).value<NoteData>();
+    NoteEditDialog dialog(note, this);
+    if (dialog.exec() == QDialog::Accepted) {
+        NoteManager::instance()->updateNote(dialog.result());
+        note_model_->refresh();
+    }
+}
+
+void MainWindow::onNotePinToggled(const QModelIndex& proxyIndex) {
+    QModelIndex sourceIndex = note_proxy_model_->mapToSource(proxyIndex);
+    NoteData note = note_model_->data(sourceIndex, NoteDataRole).value<NoteData>();
+    NoteManager::instance()->togglePin(note.id);
+    note_model_->refresh();
+}
+
+void MainWindow::onNoteCategoryChanged(const QModelIndex& proxyIndex, const QString& category) {
+    QModelIndex sourceIndex = note_proxy_model_->mapToSource(proxyIndex);
+    NoteData note = note_model_->data(sourceIndex, NoteDataRole).value<NoteData>();
+    NoteManager::instance()->updateNoteCategory(note.id, category);
+    note_model_->refresh();
+}
+
+void MainWindow::onNoteColorChanged(const QModelIndex& proxyIndex, const QString& color) {
+    QModelIndex sourceIndex = note_proxy_model_->mapToSource(proxyIndex);
+    NoteData note = note_model_->data(sourceIndex, NoteDataRole).value<NoteData>();
+    NoteManager::instance()->updateNoteColor(note.id, color);
+    note_model_->refresh();
+}
+
+void MainWindow::onNotePreviewRequested(const QModelIndex& proxyIndex) {
+    QModelIndex sourceIndex = note_proxy_model_->mapToSource(proxyIndex);
+    NoteData note = note_model_->data(sourceIndex, NoteDataRole).value<NoteData>();
+    NotePreviewDialog* dialog = new NotePreviewDialog(note, nullptr);  // parent=nullptr 使其独立
+    dialog->setAttribute(Qt::WA_DeleteOnClose);  // 关闭时自动释放内存
+    dialog->setWindowFlag(Qt::Window);           // 作为独立顶层窗口
+    dialog->show();
+}
+
+void MainWindow::onNotesDeletedMultiple(const QModelIndexList& proxyIndexes) {
+    QStringList ids;
+    for (const QModelIndex& proxyIndex : proxyIndexes) {
+        QModelIndex sourceIndex = note_proxy_model_->mapToSource(proxyIndex);
+        NoteData note = note_model_->data(sourceIndex, NoteDataRole).value<NoteData>();
+        ids.append(note.id);
+    }
+    NoteManager::instance()->removeNotes(ids);
+    note_model_->refresh();
 }
 
 // ----------------------------------------------------------------
@@ -355,12 +461,16 @@ void MainWindow::mouseReleaseEvent(QMouseEvent* event)
             event->accept();
             return;
         }
-        m_isDragging = false;
-        event->accept();
-        return;
+        if (m_isDragging) {
+            // 只有真正在拖拽时才消费事件
+            m_isDragging = false;
+            event->accept();
+            return;
+        }
     }
     QWidget::mouseReleaseEvent(event);
 }
+
 
 void MainWindow::leaveEvent(QEvent* event)
 {

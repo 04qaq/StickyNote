@@ -18,6 +18,10 @@ signals:
 	// 用户点击某个分类时发出，传递分类名称（"全部" 表示不过滤）
 	void categoryChanged(const QString& category);
 
+private slots:
+	void onAddCategoryClicked();
+	void onDeleteCategoryClicked(const QString& categoryname);
+
 private:
 	void initUI();
 	void applyStyle();
@@ -26,6 +30,7 @@ private:
 	QWidget     *category_widget_ = nullptr;
 	QVBoxLayout *category_layout_ = nullptr;
 	QPushButton *settings_button_ = nullptr;
+	QPushButton* new_category_button_ = nullptr;
 
 	QList<QPushButton*> category_buttons_;  // 动态生成的分类按钮
 	QString             current_category_;  // 当前选中的分类

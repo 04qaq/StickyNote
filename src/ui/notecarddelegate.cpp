@@ -34,6 +34,15 @@ void NoteCardDelegate::paint(QPainter* painter,
     path.addRoundedRect(cardRect, 8, 8);
     painter->fillPath(path, QColor(color.isEmpty() ? "#FFEAA7" : color));
 
+    // 4.1 选中状态：绘制高亮边框
+    bool isSelected = option.state & QStyle::State_Selected;
+    if (isSelected) {
+        painter->setPen(QPen(QColor("#2D3436"), 2.5));
+        painter->setBrush(Qt::NoBrush);
+        painter->drawPath(path);
+    }
+
+
     // 5. 绘制标题（14px bold，置顶时前缀 📌）
     QString titleText = pinned ? ("📌 " + title) : title;
     QFont titleFont = painter->font();

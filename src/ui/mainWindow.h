@@ -3,13 +3,18 @@
 #include <QWidget>
 #include <QPoint>
 #include <QVBoxLayout>
+#include <QModelIndex>
 #include "../utils/windowhelper.h"
+
+
 
 class TileBar;
 class SideBar;
 class NoteListView;
 class NoteListModel;
 class NoteCardDelegate;
+class NoteFilterProxyModel;
+class NoteEditDialog;
 
 class QPaintEvent;
 class QResizeEvent;
@@ -41,6 +46,16 @@ public slots:
     void onMinimizeRequested();
     void onMaximizeRequested();
     void onCloseRequested();
+    void onNewNoteRequested();
+    void onNoteDoubleClicked(const QModelIndex& proxyIndex);
+    void onNoteDeleted(const QModelIndex& proxyIndex);
+    void onNoteEdited(const QModelIndex& proxyIndex);
+    void onNotePinToggled(const QModelIndex& proxyIndex);
+    void onNoteCategoryChanged(const QModelIndex& proxyIndex, const QString& category);
+    void onNoteColorChanged(const QModelIndex& proxyIndex, const QString& color);
+    void onNotePreviewRequested(const QModelIndex& proxyIndex);
+    void onNotesDeletedMultiple(const QModelIndexList& proxyIndexes);
+
 
 protected:
     void paintEvent(QPaintEvent* event) override;
@@ -85,4 +100,5 @@ private:
     NoteListView*     note_list_view_ = nullptr;
     NoteListModel*    note_model_     = nullptr;
     NoteCardDelegate* note_delegate_  = nullptr;
+    NoteFilterProxyModel* note_proxy_model_ = nullptr;
 };
