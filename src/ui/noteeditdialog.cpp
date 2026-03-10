@@ -209,11 +209,22 @@ void NoteEditDialog::initUI()
 			border-radius: 6px;
 			padding: 5px 10px;
 			font-size: 13px;
+			color: #333333;
 			background: #FAFAFA;
 		}
 		QComboBox#categoryCombo:focus {
 			border-color: #1890FF;
 		}
+		QComboBox#categoryCombo QAbstractItemView {
+			background-color: #FFFFFF;
+			border: 1px solid #D9D9D9;
+			border-radius: 4px;
+			color: #333333;
+			selection-background-color: #E6F7FF;
+			selection-color: #1890FF;
+			outline: none;
+		}
+
 		QPushButton#formatBtn {
 			border: 1px solid #D9D9D9;
 			border-radius: 4px;
