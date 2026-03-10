@@ -5,9 +5,10 @@
 #include "notecarddelegate.h"
 #include "models/notelistmodel.h"
 #include "core/notemanager.h"
+#include "core/notecontroller.h"
 #include "models/notefilterproxymodel.h"
-#include "ui/noteeditdialog.h"
-#include "ui/notepreviewdialog.h"
+
+
 
 
 #include <QApplication>
@@ -114,37 +115,15 @@ void MainWindow::initUI()
 
     bodyLayout->addWidget(content_widget_, 1);   // stretch = 1，占满剩余宽度
 
-    // 加载数据
-    NoteManager::instance()->load();
+    // 创建 Controller，注入 View 和 Model
+    note_controller_ = new NoteController(note_list_view_, note_model_, note_proxy_model_, this);
 
-    // 首次运行时插入演示便签
-    if (NoteManager::instance()->notes().isEmpty()) {
-        NoteManager::instance()->addNote(NoteData::createNew(
-            "欢迎使用 Sticky Notes",
-            "这是你的第一条便签！\n你可以在这里记录任何想法、待办事项或灵感。",
-            "工作", "#FFEAA7"));
-        NoteManager::instance()->addNote(NoteData::createNew(
-            "今日计划",
-            "1. 完成项目报告\n2. 回复邮件\n3. 下午 3 点开会",
-            "工作", "#FAB1A0"));
-        NoteManager::instance()->addNote(NoteData::createNew(
-            "购物清单",
-            "- 牛奶\n- 面包\n- 鸡蛋\n- 苹果",
-            "生活", "#81ECEC"));
-        NoteManager::instance()->addNote(NoteData::createNew(
-            "Qt 学习笔记",
-            "Model/View 架构要点：\n• QAbstractListModel 负责数据\n• QListView 负责展示\n• Delegate 负责绘制每一项",
-            "学习", "#A29BFE"));
-        NoteManager::instance()->addNote(NoteData::createNew(
-            "读书摘录",
-            "「代码是写给人读的，只是顺便让机器执行。」\n—— Harold Abelson",
-            "学习", "#DFE6E9"));
-    }
-
-    note_model_->refresh();
+    // 初始化数据（加载持久化数据，首次运行插入演示便签）
+    note_controller_->initData();
 
     // 把 NoteManager 中已有的分类同步到侧边栏
     sidebar_->refreshCategories();
+
 
 
 
@@ -177,15 +156,17 @@ void MainWindow::connectSignals() {
     connect(tile_bar_, &TileBar::minimizeRequested, this, &MainWindow::onMinimizeRequested);
     connect(tile_bar_, &TileBar::maximizeRequested, this, &MainWindow::onMaximizeRequested);
     connect(tile_bar_, &TileBar::closeRequested, this, &MainWindow::onCloseRequested);
-    connect(note_list_view_, &NoteListView::doubleClicked, this, &MainWindow::onNoteDoubleClicked);
-    connect(note_list_view_, &NoteListView::deleteNoteRequested, this, &MainWindow::onNoteDeleted);
-    connect(note_list_view_, &NoteListView::editNoteRequested, this, &MainWindow::onNoteEdited);
-    connect(note_list_view_, &NoteListView::pinToggleRequested, this, &MainWindow::onNotePinToggled);
-    connect(note_list_view_, &NoteListView::changeCategoryRequested, this, &MainWindow::onNoteCategoryChanged);
-    connect(note_list_view_, &NoteListView::changeColorRequested, this, &MainWindow::onNoteColorChanged);
-    connect(note_list_view_, &NoteListView::openPreviewRequested, this, &MainWindow::onNotePreviewRequested);
-    connect(note_list_view_, &NoteListView::deleteMultipleRequested, this, &MainWindow::onNotesDeletedMultiple);
-    connect(tile_bar_, &TileBar::newNoteRequested, this, &MainWindow::onNewNoteRequested);
+    // 将 View 的用户操作信号连接到 Controller（业务逻辑由 Controller 处理）
+    connect(note_list_view_, &NoteListView::doubleClicked,          note_controller_, &NoteController::onNoteDoubleClicked);
+    connect(note_list_view_, &NoteListView::deleteNoteRequested,    note_controller_, &NoteController::onNoteDeleted);
+    connect(note_list_view_, &NoteListView::editNoteRequested,      note_controller_, &NoteController::onNoteEdited);
+    connect(note_list_view_, &NoteListView::pinToggleRequested,     note_controller_, &NoteController::onNotePinToggled);
+    connect(note_list_view_, &NoteListView::changeCategoryRequested,note_controller_, &NoteController::onNoteCategoryChanged);
+    connect(note_list_view_, &NoteListView::changeColorRequested,   note_controller_, &NoteController::onNoteColorChanged);
+    connect(note_list_view_, &NoteListView::openPreviewRequested,   note_controller_, &NoteController::onNotePreviewRequested);
+    connect(note_list_view_, &NoteListView::deleteMultipleRequested,note_controller_, &NoteController::onNotesDeletedMultiple);
+    connect(tile_bar_,       &TileBar::newNoteRequested,            note_controller_, &NoteController::onNewNoteRequested);
+
     connect(sidebar_, &SideBar::categoryChanged, note_proxy_model_,
         &NoteFilterProxyModel::setCategory);
     connect(tile_bar_, &TileBar::searchTextChanged, note_proxy_model_,
@@ -216,85 +197,9 @@ void MainWindow::onCloseRequested()
 }
 
 
-void MainWindow::onNewNoteRequested() {
-    NoteData note;
-    NoteEditDialog dialog(note, this);
-	if (dialog.exec() == QDialog::Accepted) {
-		NoteManager::instance()->addNote(dialog.result());
-		note_model_->refresh();
-	}
-}
-
-void MainWindow::onNoteDoubleClicked(const QModelIndex& proxyIndex) {
-    QModelIndex sourceIndex = note_proxy_model_->mapToSource(proxyIndex);
-    NoteData note = note_model_->data(sourceIndex, NoteDataRole).value<NoteData>();
-    NotePreviewDialog dialog(note, this);
-    dialog.exec();
-}
-
-
-void MainWindow::onNoteDeleted(const QModelIndex& proxyIndex) {
-    QModelIndex sourceIndex = note_proxy_model_->mapToSource(proxyIndex);
-    NoteData data = note_model_->data(sourceIndex, NoteDataRole).value<NoteData>();
-    NoteManager::instance()->removeNote(data.id);
-    note_model_->refresh();
-
-}
-
-
-void MainWindow::onNoteEdited(const QModelIndex& proxyIndex) {
-    QModelIndex sourceIndex = note_proxy_model_->mapToSource(proxyIndex);
-    NoteData note = note_model_->data(sourceIndex, NoteDataRole).value<NoteData>();
-    NoteEditDialog dialog(note, this);
-    if (dialog.exec() == QDialog::Accepted) {
-        NoteManager::instance()->updateNote(dialog.result());
-        note_model_->refresh();
-    }
-}
-
-void MainWindow::onNotePinToggled(const QModelIndex& proxyIndex) {
-    QModelIndex sourceIndex = note_proxy_model_->mapToSource(proxyIndex);
-    NoteData note = note_model_->data(sourceIndex, NoteDataRole).value<NoteData>();
-    NoteManager::instance()->togglePin(note.id);
-    note_model_->refresh();
-}
-
-void MainWindow::onNoteCategoryChanged(const QModelIndex& proxyIndex, const QString& category) {
-    QModelIndex sourceIndex = note_proxy_model_->mapToSource(proxyIndex);
-    NoteData note = note_model_->data(sourceIndex, NoteDataRole).value<NoteData>();
-    NoteManager::instance()->updateNoteCategory(note.id, category);
-    note_model_->refresh();
-}
-
-void MainWindow::onNoteColorChanged(const QModelIndex& proxyIndex, const QString& color) {
-    QModelIndex sourceIndex = note_proxy_model_->mapToSource(proxyIndex);
-    NoteData note = note_model_->data(sourceIndex, NoteDataRole).value<NoteData>();
-    NoteManager::instance()->updateNoteColor(note.id, color);
-    note_model_->refresh();
-}
-
-void MainWindow::onNotePreviewRequested(const QModelIndex& proxyIndex) {
-    QModelIndex sourceIndex = note_proxy_model_->mapToSource(proxyIndex);
-    NoteData note = note_model_->data(sourceIndex, NoteDataRole).value<NoteData>();
-    NotePreviewDialog* dialog = new NotePreviewDialog(note, nullptr);  // parent=nullptr 使其独立
-    dialog->setAttribute(Qt::WA_DeleteOnClose);  // 关闭时自动释放内存
-    dialog->setWindowFlag(Qt::Window);           // 作为独立顶层窗口
-    dialog->show();
-}
-
-void MainWindow::onNotesDeletedMultiple(const QModelIndexList& proxyIndexes) {
-    QStringList ids;
-    for (const QModelIndex& proxyIndex : proxyIndexes) {
-        QModelIndex sourceIndex = note_proxy_model_->mapToSource(proxyIndex);
-        NoteData note = note_model_->data(sourceIndex, NoteDataRole).value<NoteData>();
-        ids.append(note.id);
-    }
-    NoteManager::instance()->removeNotes(ids);
-    note_model_->refresh();
-}
-
 // ----------------------------------------------------------------
 // 窗口状态持久化
+
 // ----------------------------------------------------------------
 void MainWindow::saveWindowState()
 {

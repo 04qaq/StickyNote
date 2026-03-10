@@ -14,7 +14,8 @@ class NoteListView;
 class NoteListModel;
 class NoteCardDelegate;
 class NoteFilterProxyModel;
-class NoteEditDialog;
+class NoteController;
+
 
 class QPaintEvent;
 class QResizeEvent;
@@ -43,18 +44,11 @@ public:
     ~MainWindow() override;
 
 public slots:
+    // 窗口控制（属于 UI 层，保留在 MainWindow）
     void onMinimizeRequested();
     void onMaximizeRequested();
     void onCloseRequested();
-    void onNewNoteRequested();
-    void onNoteDoubleClicked(const QModelIndex& proxyIndex);
-    void onNoteDeleted(const QModelIndex& proxyIndex);
-    void onNoteEdited(const QModelIndex& proxyIndex);
-    void onNotePinToggled(const QModelIndex& proxyIndex);
-    void onNoteCategoryChanged(const QModelIndex& proxyIndex, const QString& category);
-    void onNoteColorChanged(const QModelIndex& proxyIndex, const QString& color);
-    void onNotePreviewRequested(const QModelIndex& proxyIndex);
-    void onNotesDeletedMultiple(const QModelIndexList& proxyIndexes);
+
 
 
 protected:
@@ -101,4 +95,8 @@ private:
     NoteListModel*    note_model_     = nullptr;
     NoteCardDelegate* note_delegate_  = nullptr;
     NoteFilterProxyModel* note_proxy_model_ = nullptr;
+
+    // Controller 层：负责协调 View 信号与 Model 数据操作
+    NoteController*   note_controller_ = nullptr;
 };
+
