@@ -39,6 +39,7 @@ set(SOURCES
 
     src/common/notedata.cpp
     src/core/notemanager.cpp
+    src/core/notecontroller.cpp
     src/models/notelistmodel.cpp
     src/models/notefilterproxymodel.cpp
 )
@@ -61,6 +62,8 @@ set(HEADERS
     src/common/notedata.h
     src/common/global.h
     src/core/notemanager.h
+    src/core/notecontroller.h
+
     src/models/notelistmodel.h
     src/models/notefilterproxymodel.h
 )
