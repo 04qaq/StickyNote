@@ -35,14 +35,24 @@ set(SOURCES
     src/utils/windowhelper.cpp
 
     src/ui/components/colorselector.cpp
-
+    src/ui/components/toastwidget.cpp
+    src/ui/components/toastmanager.cpp
 
     src/common/notedata.cpp
     src/core/notemanager.cpp
     src/core/notecontroller.cpp
+    src/core/undostack.cpp
+    src/core/commands/addnotecommand.cpp
+    src/core/commands/deletenotecommand.cpp
+    src/core/commands/deletemultiplenotescommand.cpp
+    src/core/commands/editnotecommand.cpp
+    src/core/commands/pinnotecommand.cpp
+    src/core/commands/changecategorycommand.cpp
+    src/core/commands/changecolorcommand.cpp
     src/models/notelistmodel.cpp
     src/models/notefilterproxymodel.cpp
 )
+
 
 
 # ---- 头文件 ----
@@ -57,16 +67,27 @@ set(HEADERS
     src/utils/windowhelper.h
 
     src/ui/components/colorselector.h
-
+    src/ui/components/toastwidget.h
+    src/ui/components/toastmanager.h
 
     src/common/notedata.h
     src/common/global.h
     src/core/notemanager.h
     src/core/notecontroller.h
+    src/core/undocommand.h
+    src/core/undostack.h
+    src/core/commands/addnotecommand.h
+    src/core/commands/deletenotecommand.h
+    src/core/commands/deletemultiplenotescommand.h
+    src/core/commands/editnotecommand.h
+    src/core/commands/pinnotecommand.h
+    src/core/commands/changecategorycommand.h
+    src/core/commands/changecolorcommand.h
 
     src/models/notelistmodel.h
     src/models/notefilterproxymodel.h
 )
+
 
 
 # 添加可执行文件
@@ -91,8 +112,10 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/utils
     ${CMAKE_CURRENT_SOURCE_DIR}/src/common
     ${CMAKE_CURRENT_SOURCE_DIR}/src/core
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/core/commands
     ${CMAKE_CURRENT_SOURCE_DIR}/src/models
 )
+
 
 
 

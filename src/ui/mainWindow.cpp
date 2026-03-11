@@ -6,7 +6,10 @@
 #include "models/notelistmodel.h"
 #include "core/notemanager.h"
 #include "core/notecontroller.h"
+#include "core/undostack.h"
 #include "models/notefilterproxymodel.h"
+#include "ui/components/toastmanager.h"
+
 
 
 
@@ -15,6 +18,10 @@
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QMenu>
+#include <QShortcut>
+#include <QKeySequence>
+
 
 
 #include <QPainter>
@@ -45,7 +52,13 @@ MainWindow::MainWindow(QWidget* parent)
 
     initUI();
     connectSignals();
+    initTray();
+    initShortcuts();
     restoreWindowState();
+
+    // 初始化 Toast 管理器，绑定父窗口（用于定位）
+    ToastManager::instance()->setParentWidget(this);
+
 
     // 为 MainWindow 自身安装过滤器（覆盖阴影区域等无子控件区域）
     installEventFilter(this);
@@ -275,9 +288,22 @@ void MainWindow::resizeEvent(QResizeEvent* event)
 
 void MainWindow::closeEvent(QCloseEvent* event)
 {
-    saveWindowState();
-    QWidget::closeEvent(event);
+    // 如果托盘图标可见，关闭时隐藏到托盘而不是退出
+    if (tray_icon_ && tray_icon_->isVisible()) {
+        hide();
+        event->ignore();  // 阻止默认的关闭行为
+        tray_icon_->showMessage(
+            "便签管理器",
+            "程序已最小化到系统托盘，双击图标可恢复窗口",
+            QSystemTrayIcon::Information,
+            2000
+        );
+    } else {
+        saveWindowState();
+        QWidget::closeEvent(event);
+    }
 }
+
 
 void MainWindow::changeEvent(QEvent* event)
 {
@@ -390,7 +416,76 @@ void MainWindow::leaveEvent(QEvent* event)
 // 事件过滤器：拦截所有子控件的鼠标移动事件，更新光标形状
 // 子控件坐标需转换为 MainWindow 坐标后再做 hitTest
 // ----------------------------------------------------------------
+// ----------------------------------------------------------------
+// 系统托盘初始化
+// ----------------------------------------------------------------
+void MainWindow::initTray()
+{
+    tray_icon_ = new QSystemTrayIcon(QIcon(":/icons/app.png"), this);
+
+    tray_menu_ = new QMenu(this);
+    tray_menu_->addAction("显示主窗口", this, [this]() {
+        show();
+        raise();
+        activateWindow();
+    });
+    tray_menu_->addAction("快速新建便签", this, [this]() {
+        show();
+        raise();
+        activateWindow();
+        note_controller_->onNewNoteRequested();
+    });
+    tray_menu_->addSeparator();
+    tray_menu_->addAction("退出", this, [this]() {
+        // 真正退出：先保存状态，再退出
+        saveWindowState();
+        tray_icon_->hide();
+        QApplication::quit();
+    });
+
+    tray_icon_->setContextMenu(tray_menu_);
+    tray_icon_->setToolTip("便签管理器");
+    tray_icon_->show();
+
+    // 双击托盘图标恢复窗口
+    connect(tray_icon_, &QSystemTrayIcon::activated,
+            this, [this](QSystemTrayIcon::ActivationReason reason) {
+        if (reason == QSystemTrayIcon::DoubleClick) {
+            show();
+            raise();
+            activateWindow();
+        }
+    });
+}
+
+// ----------------------------------------------------------------
+// 快捷键初始化
+// ----------------------------------------------------------------
+void MainWindow::initShortcuts()
+{
+    UndoStack* undo_stack = note_controller_->undoStack();
+
+    // Ctrl+Z 撤销
+    auto* undo_shortcut = new QShortcut(QKeySequence::Undo, this);
+    connect(undo_shortcut, &QShortcut::activated, this, [this, undo_stack]() {
+        if (undo_stack->canUndo()) {
+            undo_stack->undo();
+            ToastManager::instance()->show("已撤销");
+        }
+    });
+
+    // Ctrl+Y 重做
+    auto* redo_shortcut = new QShortcut(QKeySequence::Redo, this);
+    connect(redo_shortcut, &QShortcut::activated, this, [this, undo_stack]() {
+        if (undo_stack->canRedo()) {
+            undo_stack->redo();
+            ToastManager::instance()->show("已重做");
+        }
+    });
+}
+
 bool MainWindow::eventFilter(QObject* watched, QEvent* event)
+
 {
     if (event->type() == QEvent::MouseMove && !isMaximized()) {
         QWidget* w = qobject_cast<QWidget*>(watched);

@@ -1,10 +1,19 @@
 #include "notecontroller.h"
 #include "notemanager.h"
+#include "undostack.h"
+#include "commands/addnotecommand.h"
+#include "commands/deletenotecommand.h"
+#include "commands/deletemultiplenotescommand.h"
+#include "commands/editnotecommand.h"
+#include "commands/pinnotecommand.h"
+#include "commands/changecategorycommand.h"
+#include "commands/changecolorcommand.h"
 #include "models/notelistmodel.h"
 #include "models/notefilterproxymodel.h"
 #include "ui/notelistview.h"
 #include "ui/noteeditdialog.h"
 #include "ui/notepreviewdialog.h"
+#include "ui/components/toastmanager.h"
 #include "common/notedata.h"
 
 #include <QDialog>
@@ -18,6 +27,10 @@ NoteController::NoteController(NoteListView*         view,
     , model_(model)
     , proxy_model_(proxyModel)
 {
+    undo_stack_ = new UndoStack(this);
+
+    // UndoStack 执行/撤销后，NoteManager 的数据已变更，刷新 Model
+    connect(undo_stack_, &UndoStack::stackChanged, model_, &NoteListModel::refresh);
 }
 
 // ----------------------------------------------------------------
@@ -54,20 +67,21 @@ void NoteController::initData()
 }
 
 // ----------------------------------------------------------------
-// 新建便签：弹出编辑对话框，确认后写入数据层
+// 新建便签：弹出编辑对话框，确认后通过 Command 写入数据层
 // ----------------------------------------------------------------
 void NoteController::onNewNoteRequested()
 {
     NoteData note;
     NoteEditDialog dialog(note, view_);
     if (dialog.exec() == QDialog::Accepted) {
-        NoteManager::instance()->addNote(dialog.result());
-        model_->refresh();
+        auto cmd = std::make_unique<AddNoteCommand>(dialog.result());
+        undo_stack_->push(std::move(cmd));
+        ToastManager::instance()->show("便签已创建");
     }
 }
 
 // ----------------------------------------------------------------
-// 双击便签：弹出预览对话框（只读）
+// 双击便签：弹出预览对话框（只读，不产生 Command）
 // ----------------------------------------------------------------
 void NoteController::onNoteDoubleClicked(const QModelIndex& proxyIndex)
 {
@@ -78,87 +92,96 @@ void NoteController::onNoteDoubleClicked(const QModelIndex& proxyIndex)
 }
 
 // ----------------------------------------------------------------
-// 删除便签：从数据层移除，刷新视图
+// 删除便签：通过 Command 删除，支持撤销
 // ----------------------------------------------------------------
 void NoteController::onNoteDeleted(const QModelIndex& proxyIndex)
 {
     QModelIndex sourceIndex = proxy_model_->mapToSource(proxyIndex);
     NoteData note = model_->data(sourceIndex, NoteDataRole).value<NoteData>();
-    NoteManager::instance()->removeNote(note.id);
-    model_->refresh();
+    auto cmd = std::make_unique<DeleteNoteCommand>(note);
+    undo_stack_->push(std::move(cmd));
+    ToastManager::instance()->show("便签已删除（Ctrl+Z 可撤销）");
 }
 
 // ----------------------------------------------------------------
-// 编辑便签：弹出编辑对话框，确认后更新数据层
+// 编辑便签：弹出编辑对话框，确认后通过 Command 更新数据层
 // ----------------------------------------------------------------
 void NoteController::onNoteEdited(const QModelIndex& proxyIndex)
 {
     QModelIndex sourceIndex = proxy_model_->mapToSource(proxyIndex);
-    NoteData note = model_->data(sourceIndex, NoteDataRole).value<NoteData>();
-    NoteEditDialog dialog(note, view_);
+    NoteData old_note = model_->data(sourceIndex, NoteDataRole).value<NoteData>();
+    NoteEditDialog dialog(old_note, view_);
     if (dialog.exec() == QDialog::Accepted) {
-        NoteManager::instance()->updateNote(dialog.result());
-        model_->refresh();
+        auto cmd = std::make_unique<EditNoteCommand>(old_note, dialog.result());
+        undo_stack_->push(std::move(cmd));
+        ToastManager::instance()->show("便签已更新");
     }
 }
 
 // ----------------------------------------------------------------
-// 切换置顶：更新数据层，刷新视图
+// 切换置顶：通过 Command 切换，支持撤销
 // ----------------------------------------------------------------
 void NoteController::onNotePinToggled(const QModelIndex& proxyIndex)
 {
     QModelIndex sourceIndex = proxy_model_->mapToSource(proxyIndex);
     NoteData note = model_->data(sourceIndex, NoteDataRole).value<NoteData>();
-    NoteManager::instance()->togglePin(note.id);
-    model_->refresh();
+    auto cmd = std::make_unique<PinNoteCommand>(note.id, note.pinned);
+    undo_stack_->push(std::move(cmd));
+    ToastManager::instance()->show(note.pinned ? "已取消置顶" : "已置顶");
 }
 
 // ----------------------------------------------------------------
-// 修改分类：更新数据层，刷新视图
+// 修改分类：通过 Command 修改，支持撤销
 // ----------------------------------------------------------------
 void NoteController::onNoteCategoryChanged(const QModelIndex& proxyIndex, const QString& category)
 {
     QModelIndex sourceIndex = proxy_model_->mapToSource(proxyIndex);
     NoteData note = model_->data(sourceIndex, NoteDataRole).value<NoteData>();
-    NoteManager::instance()->updateNoteCategory(note.id, category);
-    model_->refresh();
+    if (note.category == category) return;  // 未变化，不产生命令
+    auto cmd = std::make_unique<ChangeCategoryCommand>(note.id, note.category, category);
+    undo_stack_->push(std::move(cmd));
+    ToastManager::instance()->show(QString("分类已改为「%1」").arg(category));
 }
 
 // ----------------------------------------------------------------
-// 修改颜色：更新数据层，刷新视图
+// 修改颜色：通过 Command 修改，支持撤销
 // ----------------------------------------------------------------
 void NoteController::onNoteColorChanged(const QModelIndex& proxyIndex, const QString& color)
 {
     QModelIndex sourceIndex = proxy_model_->mapToSource(proxyIndex);
     NoteData note = model_->data(sourceIndex, NoteDataRole).value<NoteData>();
-    NoteManager::instance()->updateNoteColor(note.id, color);
-    model_->refresh();
+    if (note.color == color) return;  // 未变化，不产生命令
+    auto cmd = std::make_unique<ChangeColorCommand>(note.id, note.color, color);
+    undo_stack_->push(std::move(cmd));
+    ToastManager::instance()->show("颜色已更新");
 }
 
 // ----------------------------------------------------------------
-// 预览便签：以独立顶层窗口打开预览对话框
+// 预览便签：以独立顶层窗口打开（不产生 Command）
 // ----------------------------------------------------------------
 void NoteController::onNotePreviewRequested(const QModelIndex& proxyIndex)
 {
     QModelIndex sourceIndex = proxy_model_->mapToSource(proxyIndex);
     NoteData note = model_->data(sourceIndex, NoteDataRole).value<NoteData>();
-    NotePreviewDialog* dialog = new NotePreviewDialog(note, nullptr);  // parent=nullptr 使其独立
-    dialog->setAttribute(Qt::WA_DeleteOnClose);  // 关闭时自动释放内存
-    dialog->setWindowFlag(Qt::Window);           // 作为独立顶层窗口
+    NotePreviewDialog* dialog = new NotePreviewDialog(note, nullptr);
+    dialog->setAttribute(Qt::WA_DeleteOnClose);
+    dialog->setWindowFlag(Qt::Window);
     dialog->show();
 }
 
 // ----------------------------------------------------------------
-// 批量删除：收集所有选中便签的 id，一次性从数据层移除
+// 批量删除：通过 Command 批量删除，支持撤销
 // ----------------------------------------------------------------
 void NoteController::onNotesDeletedMultiple(const QModelIndexList& proxyIndexes)
 {
-    QStringList ids;
+    QList<NoteData> notes;
     for (const QModelIndex& proxyIndex : proxyIndexes) {
         QModelIndex sourceIndex = proxy_model_->mapToSource(proxyIndex);
         NoteData note = model_->data(sourceIndex, NoteDataRole).value<NoteData>();
-        ids.append(note.id);
+        notes.append(note);
     }
-    NoteManager::instance()->removeNotes(ids);
-    model_->refresh();
+    auto cmd = std::make_unique<DeleteMultipleNotesCommand>(notes);
+    undo_stack_->push(std::move(cmd));
+    ToastManager::instance()->show(
+        QString("已删除 %1 条便签（Ctrl+Z 可撤销）").arg(notes.size()));
 }

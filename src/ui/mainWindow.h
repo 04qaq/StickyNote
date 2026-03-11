@@ -4,6 +4,7 @@
 #include <QPoint>
 #include <QVBoxLayout>
 #include <QModelIndex>
+#include <QSystemTrayIcon>
 #include "../utils/windowhelper.h"
 
 
@@ -16,7 +17,8 @@ class NoteCardDelegate;
 class NoteFilterProxyModel;
 class NoteController;
 
-
+class QMenu;
+class QPushButton;
 class QPaintEvent;
 class QResizeEvent;
 class QCloseEvent;
@@ -34,6 +36,8 @@ class QEvent;
 //   · 无系统边框 + 圆角 + 投影
 //   · 标题栏区域支持拖拽移动
 //   · 窗口位置与尺寸持久化（QSettings）
+//   · 系统托盘：关闭时隐藏到托盘，双击恢复
+//   · 撤销/重做：Ctrl+Z / Ctrl+Y 快捷键
 // ============================================================
 class MainWindow : public QWidget
 {
@@ -67,6 +71,8 @@ private:
 
     void initUI();
     void connectSignals();
+    void initTray();          // 初始化系统托盘
+    void initShortcuts();     // 初始化快捷键
 
     void saveWindowState();
     void restoreWindowState();
@@ -98,5 +104,9 @@ private:
 
     // Controller 层：负责协调 View 信号与 Model 数据操作
     NoteController*   note_controller_ = nullptr;
+
+    // ---- 系统托盘 ----
+    QSystemTrayIcon*  tray_icon_  = nullptr;
+    QMenu*            tray_menu_  = nullptr;
 };
 

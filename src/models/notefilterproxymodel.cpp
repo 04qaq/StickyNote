@@ -17,8 +17,8 @@ void NoteFilterProxyModel::setCategory(const QString& category) {
     invalidateFilter();
 }
 
-
 bool NoteFilterProxyModel::filterAcceptsRow(int sourceRow, const QModelIndex& sourceParent) const {
+
     QModelIndex index = sourceModel()->index(sourceRow, 0, sourceParent);
 
     QString category = index.data(NoteRole::NoteCategoryRole).toString();

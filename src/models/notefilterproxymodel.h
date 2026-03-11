@@ -2,6 +2,8 @@
 #include <QSortFilterProxyModel>
 #include "notelistmodel.h"
 
+
+
 class NoteFilterProxyModel:public QSortFilterProxyModel {
     Q_OBJECT
 public:
@@ -14,6 +16,9 @@ public:
 
 protected:
 	bool filterAcceptsRow(int sourceRow, const QModelIndex& sourceParent) const override;
+
+
+
 
 private:
 	QString keyword_;

@@ -2,6 +2,7 @@
 
 #include <QObject>
 #include <QModelIndex>
+#include "undostack.h"
 
 class NoteListView;
 class NoteListModel;
@@ -10,22 +11,23 @@ class NoteFilterProxyModel;
 // ============================================================
 // NoteController —— MVC 中的 Controller 层
 //   · 接收 View 发出的用户操作信号
-//   · 调用 NoteManager（数据层）执行数据操作
-//   · 通知 NoteListModel 刷新视图
+//   · 将操作封装为 Command 推入 UndoStack（支持撤销/重做）
+//   · 操作完成后通过 ToastManager 显示轻提示
 // ============================================================
 class NoteController : public QObject
 {
     Q_OBJECT
 
 public:
-    // 构造时注入所有需要协调的对象
     explicit NoteController(NoteListView*         view,
                             NoteListModel*        model,
                             NoteFilterProxyModel* proxyModel,
                             QObject*              parent = nullptr);
 
-    // 初始化数据：加载持久化数据，首次运行时插入演示便签
     void initData();
+
+    // 提供给 MainWindow 连接按钮状态
+    UndoStack* undoStack() const { return undo_stack_; }
 
 public slots:
     void onNewNoteRequested();
@@ -39,9 +41,8 @@ public slots:
     void onNotesDeletedMultiple(const QModelIndexList& proxyIndexes);
 
 private:
-    // 将 proxyIndex 转换为 sourceIndex，并取出对应的 NoteData
-    // 这是 Controller 中最常用的辅助操作，抽成私有方法避免重复
     NoteListView*         view_;
     NoteListModel*        model_;
     NoteFilterProxyModel* proxy_model_;
+    UndoStack*            undo_stack_ = nullptr;
 };
